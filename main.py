@@ -1,45 +1,33 @@
-from fastapi import FastAPI, HTTPException, Depends,responses,status
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, HTTPException,status
 from config import database
-import models,schemas
-
-
-models.Base.metadata.create_all(bind=database.engine)
-
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
+import schemas
 
 
 app = FastAPI()
 
-@app.post("/registration/",response_model=schemas.User)
-def register(user: schemas.UserCreate,db: Session = Depends(get_db)):
-  
-    existing_user = db.query(models.User).filter(models.User.email == user.email).first()
+
+@app.post("/registration/", response_model=schemas.User)
+def register(user: schemas.UserCreate):
+    existing_user = database.collection.find_one({"email": user.email})
 
     if existing_user:
         raise HTTPException(status_code=status.HTTP_302_FOUND, detail='Email already exists')
-    
-    user = models.User(full_name=user.full_name,email=user.email,password=user.password)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
 
-    return user
+    result = database.collection.insert_one(dict(user))
+
+    user_id = str(result.inserted_id)
+
+    return schemas.User(id=user_id, full_name=user.full_name, email=user.email)
     
 
 @app.post("/login/")
-def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == user.email).first()
+def login(user: schemas.UserLogin):
+    user_data = database.collection.find_one({"email": user.email})
 
-    if user is None or user.password != user.password:
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+    if user_data is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email does not exist")
 
-
+    if user_data["password"] != user.password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    
     return {"message": "Login successful"}
