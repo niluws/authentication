@@ -5,15 +5,16 @@ import schemas
 
 app = FastAPI()
 
+db=database.DatabaseSingleton()
 
-@app.post("/registration/", response_model=schemas.User)
+@app.post("/register/", response_model=schemas.User)
 def register(user: schemas.UserCreate):
-    existing_user = database.collection.find_one({"email": user.email})
+    existing_user = db.collection.find_one({"email": user.email})
 
     if existing_user:
         raise HTTPException(status_code=status.HTTP_302_FOUND, detail='Email already exists')
 
-    result = database.collection.insert_one(dict(user))
+    result = db.collection.insert_one(dict(user))
 
     user_id = str(result.inserted_id)
 
@@ -22,7 +23,7 @@ def register(user: schemas.UserCreate):
 
 @app.post("/login/")
 def login(user: schemas.UserLogin):
-    user_data = database.collection.find_one({"email": user.email})
+    user_data = db.collection.find_one({"email": user.email})
 
     if user_data is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email does not exist")
